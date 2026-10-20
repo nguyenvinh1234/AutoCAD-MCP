@@ -6,6 +6,8 @@ Branch: `ngoc-viet-cnc/safe-dxf-laser`
 
 Starting commit: `b37ff2d39a534fa916bfa37374af17afe066d4f3`
 
+Acceptance implementation commit: `c889ff416ce1b3023737b6b0e201ab5b8f17be64`
+
 ## Result
 
 | Check | Result | Evidence |
@@ -24,7 +26,7 @@ Starting commit: `b37ff2d39a534fa916bfa37374af17afe066d4f3`
 | Dependency audit | PASS WITH EXCEPTIONS | `pip-audit`: no known vulnerabilities found, 12 findings explicitly ignored under the project's documented exception list; local `autocad-mcp` is not on PyPI. |
 | DWG output | NOT TESTED | This acceptance deliberately produced DXF only. |
 | Production drawing / laser control | NOT TESTED | Intentionally outside scope; no production or laser operation was performed. |
-| GitHub PR | PENDING | Authentication/fork/push is handled after local evidence review; no upstream push or merge is permitted. |
+| GitHub draft PR | PASS | `https://github.com/beiming183-cloud/AutoCAD-MCP/pull/2`; opened from the `nguyenvinh1234` fork, not merged. |
 
 ## Geometry verified independently
 
