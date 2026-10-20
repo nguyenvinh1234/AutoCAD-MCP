@@ -99,11 +99,25 @@ async def test_stdio_mcp_create_read_resize_and_validate(managed_root):
             tools = await session.list_tools()
             assert {tool.name for tool in tools.tools} == {
                 "create_laser_plate",
+                "create_square_center_edge_plate",
                 "resize_laser_plate",
                 "inspect_dxf",
                 "validate_laser_plate",
                 "list_test_dxfs",
             }
+            square = await session.call_tool(
+                "create_square_center_edge_plate",
+                {
+                    "output_name": "mcp-square-400.dxf",
+                    "side_mm": 400,
+                    "center_hole_diameter_mm": 50,
+                    "edge_hole_diameter_mm": 15,
+                    "edge_offset_mm": 20,
+                },
+            )
+            square_result = json.loads(square.content[0].text)
+            assert square_result["valid"] is True
+            assert square_result["inspection"]["entity_count"] == 6
             created = await session.call_tool("create_laser_plate", {"output_name": "mcp-created.dxf"})
             assert json.loads(created.content[0].text)["valid"] is True
             inspected = await session.call_tool("inspect_dxf", {"name": "mcp-created.dxf"})
@@ -150,5 +164,6 @@ def test_installed_entrypoints_expose_only_safe_server():
     }
     assert scripts == {
         "autocad-mcp": "autocad_mcp.safe_server:main",
+        "ngoc-viet-autocad-live-mcp": "autocad_mcp.live_autocad_server:main",
         "ngoc-viet-autocad-mcp": "autocad_mcp.safe_server:main",
     }

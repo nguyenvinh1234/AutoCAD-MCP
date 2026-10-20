@@ -58,6 +58,38 @@ class PlateSpec:
         ]
 
 
+@dataclass(frozen=True)
+class SquareCenterEdgeSpec:
+    side_mm: float = 400.0
+    center_hole_diameter_mm: float = 50.0
+    edge_hole_diameter_mm: float = 15.0
+    edge_offset_mm: float = 20.0
+
+    def validated(self) -> "SquareCenterEdgeSpec":
+        for name, value in asdict(self).items():
+            if isinstance(value, bool) or not math.isfinite(float(value)) or float(value) <= 0:
+                raise ValueError(f"{name} must be a finite positive number")
+        if self.edge_offset_mm <= self.edge_hole_diameter_mm / 2.0:
+            raise ValueError("edge_offset_mm must be greater than the edge-hole radius")
+        if self.side_mm <= 2.0 * self.edge_offset_mm:
+            raise ValueError("side_mm must be greater than twice edge_offset_mm")
+        if self.center_hole_diameter_mm >= self.side_mm:
+            raise ValueError("center hole must fit inside the square")
+        return self
+
+    @property
+    def holes(self) -> list[tuple[tuple[float, float], float]]:
+        middle = self.side_mm / 2.0
+        offset = self.edge_offset_mm
+        return [
+            ((middle, middle), self.center_hole_diameter_mm / 2.0),
+            ((middle, offset), self.edge_hole_diameter_mm / 2.0),
+            ((middle, self.side_mm - offset), self.edge_hole_diameter_mm / 2.0),
+            ((offset, middle), self.edge_hole_diameter_mm / 2.0),
+            ((self.side_mm - offset, middle), self.edge_hole_diameter_mm / 2.0),
+        ]
+
+
 def workspace_root() -> Path:
     root = Path(os.environ.get(DXF_ROOT_ENV, DEFAULT_ROOT)).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -123,6 +155,48 @@ def create_laser_plate(name: str, spec: PlateSpec) -> dict[str, Any]:
     report = validate_laser_plate(name, spec)
     report.update({"created": True, "path": str(target)})
     return report
+
+
+def create_square_center_edge_plate(name: str, spec: SquareCenterEdgeSpec) -> dict[str, Any]:
+    spec = spec.validated()
+    target = resolve_managed_dxf(name)
+    doc = _new_document()
+    msp = doc.modelspace()
+    side = spec.side_mm
+    expected_points = [(0.0, 0.0), (side, 0.0), (side, side), (0.0, side)]
+    msp.add_lwpolyline(expected_points, close=True, dxfattribs={"layer": OUTER_LAYER})
+    for centre, radius in spec.holes:
+        msp.add_circle(centre, radius, dxfattribs={"layer": INNER_LAYER})
+    _save_new(doc, target)
+
+    inspection = inspect_dxf(name)
+    polylines = [item for item in inspection["geometry"] if item["type"] == "LWPOLYLINE"]
+    circles = [item for item in inspection["geometry"] if item["type"] == "CIRCLE"]
+    actual_holes = sorted(
+        (_rounded(item["center_mm"][0]), _rounded(item["center_mm"][1]), _rounded(item["radius_mm"]))
+        for item in circles
+    )
+    expected_holes = sorted((_rounded(x), _rounded(y), _rounded(radius)) for (x, y), radius in spec.holes)
+    checks = {
+        "units_mm": inspection["units"] == "mm",
+        "entity_count_6": inspection["entity_count"] == 6,
+        "outer_closed": len(polylines) == 1 and polylines[0]["closed"],
+        "outer_dimensions": len(polylines) == 1 and polylines[0]["points_mm"] == expected_points,
+        "five_holes": actual_holes == expected_holes,
+        "layers": inspection["layers"] == {OUTER_LAYER: 1, INNER_LAYER: 5},
+        "no_duplicates": inspection["duplicate_count"] == 0,
+        "no_unsupported_entities": not inspection["unsupported_entity_handles"],
+        "no_dxf_audit_errors": inspection["audit_error_count"] == 0,
+        "six_closed_contours": inspection["closed_contours"] == 6,
+    }
+    return {
+        "valid": all(checks.values()),
+        "checks": checks,
+        "expected": asdict(spec),
+        "inspection": inspection,
+        "created": True,
+        "path": str(target),
+    }
 
 
 def resize_laser_plate(source_name: str, output_name: str, spec: PlateSpec) -> dict[str, Any]:

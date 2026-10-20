@@ -8,7 +8,9 @@ from mcp.server.fastmcp import FastMCP
 
 from .safe_dxf import (
     PlateSpec,
+    SquareCenterEdgeSpec,
     create_laser_plate as create_plate,
+    create_square_center_edge_plate as create_square_plate,
     inspect_dxf as inspect_file,
     list_managed_dxfs,
     resize_laser_plate as resize_plate,
@@ -34,6 +36,23 @@ def create_laser_plate(
 ) -> str:
     """Create a new, non-overwriting DXF plate inside the managed test workspace."""
     return _json(create_plate(output_name, PlateSpec(width_mm, height_mm, hole_diameter_mm, edge_offset_mm)))
+
+
+@mcp.tool(annotations={"title": "Create Square Center and Edge Hole Plate", "readOnlyHint": False, "destructiveHint": False})
+def create_square_center_edge_plate(
+    output_name: str,
+    side_mm: float = 400.0,
+    center_hole_diameter_mm: float = 50.0,
+    edge_hole_diameter_mm: float = 15.0,
+    edge_offset_mm: float = 20.0,
+) -> str:
+    """Create a square with one centre hole and four midpoint edge-offset holes."""
+    return _json(
+        create_square_plate(
+            output_name,
+            SquareCenterEdgeSpec(side_mm, center_hole_diameter_mm, edge_hole_diameter_mm, edge_offset_mm),
+        )
+    )
 
 
 @mcp.tool(annotations={"title": "Resize Laser Test Plate", "readOnlyHint": False, "destructiveHint": False})
